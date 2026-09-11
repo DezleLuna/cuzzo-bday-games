@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>CUZ BDay Games</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#02030a;color:#fff;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+body{display:grid;place-items:start center;overflow-x:hidden}
+.frame{position:relative;width:min(100vw,1100px);aspect-ratio:1/1;background:#02030a;overflow:hidden}
+.base{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;user-select:none}
+.wheelGroup{position:absolute;inset:0;z-index:2;transform-origin:49.8698% 52.9297%;will-change:transform;pointer-events:none}
+.segment{position:absolute;inset:0;width:100%;height:100%;user-select:none;transition:opacity .25s ease}
+.segment.removed{opacity:0}
+.pointerOverlay{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;user-select:none}
+.spinHotspot{position:absolute;z-index:7;left:49.8698%;top:52.9297%;transform:translate(-50%,-50%);width:22%;aspect-ratio:1;border-radius:50%;border:0;background:transparent;cursor:pointer}
+.soundHotspot{position:absolute;z-index:7;right:2.2%;bottom:3.4%;width:13%;aspect-ratio:1;border-radius:50%;border:0;background:transparent;cursor:pointer}
+.result{position:absolute;z-index:10;left:50%;bottom:2.5%;transform:translateX(-50%) translateY(135%);width:76%;padding:14px 16px 12px;border-radius:18px;background:linear-gradient(180deg,rgba(8,12,28,.97),rgba(3,6,17,.97));border:1px solid rgba(255,255,255,.25);box-shadow:0 0 24px rgba(61,199,255,.35),0 16px 46px rgba(0,0,0,.65);text-align:center;transition:.35s ease}
+.result.show{transform:translateX(-50%) translateY(0)}
+.eyebrow{font-size:clamp(9px,1.4vw,14px);font-weight:1000;letter-spacing:.18em;text-transform:uppercase;color:#6ce6ff}
+.winner{font-size:clamp(17px,3vw,34px);font-weight:1000;margin-top:4px}
+.actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.actions button{border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:9px 13px;background:#11182c;color:white;font-weight:900;cursor:pointer;font-size:clamp(9px,1.4vw,14px)}
+.actions .primary{background:linear-gradient(90deg,#0e91e8,#754cff)}
+.finalFlash{animation:flash 1s ease-in-out infinite alternate}
+@keyframes flash{to{filter:brightness(1.16) saturate(1.12)}}
+</style>
+</head>
+<body>
+<div id="frame" class="frame">
+  <img class="base" src="base.jpg" alt="CUZ BDay Games">
+
+  <div id="wheelGroup" class="wheelGroup">
+    <img id="seg-music" class="segment" src="music.webp" alt="">
+    <img id="seg-question" class="segment" src="question.webp" alt="">
+    <img id="seg-monkey" class="segment" src="monkey.webp" alt="">
+    <img id="seg-spotlight" class="segment" src="spotlight.webp" alt="">
+  </div>
+
+  <img class="pointerOverlay" src="pointer.webp" alt="">
+
+  <button id="spinBtn" class="spinHotspot" aria-label="Spin"></button>
+  <button id="soundBtn" class="soundHotspot" aria-label="Toggle sound"></button>
+
+  <div id="result" class="result">
+    <div class="eyebrow">Next Game</div>
+    <div id="winner" class="winner"></div>
+    <div class="actions">
+      <button id="completeBtn" class="primary">MARK GAME COMPLETE</button>
+      <button id="spinAgainBtn">SPIN AGAIN</button>
+      <button id="resetBtn">RESET</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const GAMES=[
+ {id:"music",name:"TESTING 1, 2 THE 3",center:225},
+ {id:"question",name:"WHAT WOULD CUZ DO..",center:315},
+ {id:"monkey",name:"SEE, SPEAK & HEAR",center:45},
+ {id:"spotlight",name:"SPOTLIGHT",center:135}
+];
+
+let active=GAMES.map(g=>g.id),selected=null,spinning=false,soundOn=true,rotation=0,audioCtx=null;
+const wheelGroup=document.getElementById("wheelGroup");
+const frame=document.getElementById("frame");
+const spinBtn=document.getElementById("spinBtn");
+const soundBtn=document.getElementById("soundBtn");
+const result=document.getElementById("result");
+const winner=document.getElementById("winner");
+const completeBtn=document.getElementById("completeBtn");
+const spinAgainBtn=document.getElementById("spinAgainBtn");
+const resetBtn=document.getElementById("resetBtn");
+
+function ensureAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==="suspended")audioCtx.resume()}
+function tone(f=440,d=.08,type="sine",gain=.05,when=0){if(!soundOn)return;ensureAudio();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(.0001,audioCtx.currentTime+when);g.gain.exponentialRampToValueAtTime(gain,audioCtx.currentTime+when+.006);g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+when+d);o.connect(g).connect(audioCtx.destination);o.start(audioCtx.currentTime+when);o.stop(audioCtx.currentTime+when+d+.03)}
+function tick(s=1){tone(900*s,.028,"square",.017)}
+function win(){tone(523,.12,"sine",.065);tone(659,.14,"sine",.07,.1);tone(784,.28,"sine",.09,.22)}
+function done(){tone(440,.08,"triangle",.04);tone(660,.12,"triangle",.05,.07)}
+function finale(){tone(196,.22,"sawtooth",.05);tone(392,.26,"sawtooth",.06,.15);tone(784,.38,"sine",.1,.3)}
+const norm=d=>((d%360)+360)%360;
+const gameById=id=>GAMES.find(g=>g.id===id);
+
+function spin(){
+  if(spinning||active.length===0)return;
+  ensureAudio();result.classList.remove("show");
+  spinning=true;selected=null;spinBtn.disabled=true;
+
+  if(active.length===1){
+    selected=gameById(active[0]);
+    winner.textContent=selected.name;
+    result.querySelector(".eyebrow").textContent="FINAL GAME UNLOCKED";
+    result.classList.add("show");frame.classList.add("finalFlash");finale();
+    spinning=false;spinBtn.disabled=true;return;
+  }
+
+  const id=active[Math.floor(Math.random()*active.length)];
+  const g=gameById(id);
+  const targetBase=270-g.center;
+  const delta=norm(targetBase-norm(rotation));
+  const turns=6+Math.floor(Math.random()*3);
+  const target=rotation+turns*360+delta;
+  const startRot=rotation,duration=4700+Math.random()*700,t0=performance.now();
+  let last=-1;
+  const ease=t=>1-Math.pow(1-t,3);
+
+  function anim(now){
+    const t=Math.min(1,(now-t0)/duration);
+    rotation=startRot+(target-startRot)*ease(t);
+    wheelGroup.style.transform=`rotate(${rotation}deg)`;
+    const k=Math.floor(rotation/18);
+    if(k!==last&&t<.97){tick(1.1-t*.3);last=k}
+    if(t<1)requestAnimationFrame(anim);
+    else{
+      rotation=target;
+      wheelGroup.style.transform=`rotate(${rotation}deg)`;
+      selected=g;spinning=false;spinBtn.disabled=false;
+      winner.textContent=g.name;
+      result.querySelector(".eyebrow").textContent="NEXT GAME";
+      result.classList.add("show");win();
+    }
+  }
+  requestAnimationFrame(anim);
+}
+
+function complete(){
+  if(!selected)return;
+  done();
+  const id=selected.id;
+  active=active.filter(x=>x!==id);
+  document.getElementById("seg-"+id).classList.add("removed");
+  selected=null;result.classList.remove("show");frame.classList.remove("finalFlash");
+
+  wheelGroup.style.transition="transform .55s ease";
+  rotation=0;
+  wheelGroup.style.transform="rotate(0deg)";
+  setTimeout(()=>wheelGroup.style.transition="",600);
+
+  if(active.length===1){
+    setTimeout(()=>{
+      selected=gameById(active[0]);
+      winner.textContent=selected.name;
+      result.querySelector(".eyebrow").textContent="FINAL GAME UNLOCKED";
+      result.classList.add("show");frame.classList.add("finalFlash");finale();
+      spinBtn.disabled=true;
+    },650);
+  } else spinBtn.disabled=false;
+}
+
+function resetAll(){
+  active=GAMES.map(g=>g.id);selected=null;spinning=false;rotation=0;
+  document.querySelectorAll(".segment").forEach(s=>s.classList.remove("removed"));
+  wheelGroup.style.transition="none";wheelGroup.style.transform="rotate(0deg)";
+  result.classList.remove("show");frame.classList.remove("finalFlash");spinBtn.disabled=false;
+}
+
+spinBtn.onclick=spin;
+spinAgainBtn.onclick=()=>{result.classList.remove("show");spin()};
+completeBtn.onclick=complete;
+resetBtn.onclick=resetAll;
+soundBtn.onclick=()=>{soundOn=!soundOn;if(soundOn){ensureAudio();tone(720,.08,"sine",.05)}};
+</script>
+</body>
+</html>
