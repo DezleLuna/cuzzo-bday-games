@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>Cuzzo BDay Games Spinner</title>
+<style>
+  :root{
+    --bg:#050814;
+    --panel:#0b1020;
+    --blue:#20a7ff;
+    --blue2:#69d7ff;
+    --silver:#d8e4f0;
+    --muted:#7f8da8;
+    --glow:0 0 14px rgba(32,167,255,.75), 0 0 32px rgba(32,167,255,.25);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    color:white;
+    background:
+      radial-gradient(circle at 50% 10%, rgba(35,137,255,.14), transparent 32%),
+      radial-gradient(circle at 50% 100%, rgba(104,64,255,.12), transparent 34%),
+      var(--bg);
+    overflow-x:hidden;
+  }
+  .wrap{
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:18px;
+    padding:28px 18px 36px;
+  }
+  h1{
+    margin:0;
+    font-size:clamp(26px,4vw,48px);
+    letter-spacing:.09em;
+    text-transform:uppercase;
+    text-align:center;
+    text-shadow:var(--glow);
+  }
+  .sub{
+    color:var(--muted);
+    margin-top:-8px;
+    font-size:14px;
+    text-align:center;
+  }
+  .stage{
+    width:min(92vw,720px);
+    display:grid;
+    place-items:center;
+    position:relative;
+  }
+  .pointer{
+    position:absolute;
+    top:-10px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:5;
+    width:0;height:0;
+    border-left:22px solid transparent;
+    border-right:22px solid transparent;
+    border-top:0;
+    border-bottom:42px solid var(--silver);
+    filter:drop-shadow(0 0 8px rgba(255,255,255,.5));
+  }
+  canvas{
+    width:min(86vw,620px);
+    height:min(86vw,620px);
+    max-width:620px;
+    max-height:620px;
+    border-radius:50%;
+    box-shadow:
+      0 0 0 10px #11192d,
+      0 0 0 12px rgba(216,228,240,.6),
+      0 0 45px rgba(32,167,255,.28);
+    background:#0d1324;
+  }
+  .centerBtn{
+    position:absolute;
+    z-index:4;
+    width:112px;height:112px;
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,.7);
+    background:linear-gradient(180deg,#18243d,#0c1222);
+    color:white;
+    font-weight:900;
+    letter-spacing:.08em;
+    font-size:22px;
+    cursor:pointer;
+    box-shadow:var(--glow);
+    transition:.2s;
+  }
+  .centerBtn:active{transform:scale(.96)}
+  .centerBtn:disabled{
+    opacity:.5;
+    cursor:not-allowed;
+    box-shadow:none;
+  }
+  .result{
+    width:min(92vw,760px);
+    min-height:86px;
+    border:1px solid rgba(255,255,255,.15);
+    background:linear-gradient(180deg,rgba(16,24,43,.95),rgba(8,12,23,.95));
+    border-radius:18px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:14px 18px;
+    box-shadow:0 16px 50px rgba(0,0,0,.3);
+  }
+  .result .eyebrow{
+    color:var(--blue2);
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+  }
+  .result .winner{
+    margin-top:4px;
+    font-size:clamp(20px,3.4vw,36px);
+    font-weight:900;
+  }
+  .controls{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:10px;
+  }
+  button.action{
+    border:1px solid rgba(255,255,255,.2);
+    border-radius:12px;
+    padding:12px 18px;
+    font-size:14px;
+    font-weight:800;
+    cursor:pointer;
+    color:white;
+    background:#111a2f;
+  }
+  button.action.primary{
+    background:linear-gradient(90deg,#0e7cd5,#5c49e8);
+    box-shadow:0 0 18px rgba(32,167,255,.25);
+  }
+  button.action:disabled{
+    opacity:.35;
+    cursor:not-allowed;
+  }
+  .remaining{
+    color:#aebbd0;
+    font-size:13px;
+    text-align:center;
+  }
+  .final{
+    animation:pulse 1.2s ease-in-out infinite alternate;
+  }
+  @keyframes pulse{
+    from{filter:drop-shadow(0 0 0 rgba(32,167,255,0))}
+    to{filter:drop-shadow(0 0 16px rgba(32,167,255,.85))}
+  }
+  .tiny{
+    color:#5f6f89;
+    font-size:11px;
+    text-align:center;
+    max-width:650px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CUZZO BDAY GAMES</h1>
+  <div class="sub">Interactive Main Wheel</div>
+
+  <div class="stage">
+    <div class="pointer"></div>
+    <canvas id="wheel" width="900" height="900"></canvas>
+    <button id="spinBtn" class="centerBtn">SPIN</button>
+  </div>
+
+  <div id="result" class="result">
+    <div class="eyebrow">Ready</div>
+    <div class="winner">Spin for the next game</div>
+  </div>
+
+  <div class="controls">
+    <button id="completeBtn" class="action primary" disabled>MARK GAME COMPLETE</button>
+    <button id="spinAgainBtn" class="action" disabled>SPIN AGAIN</button>
+    <button id="resetBtn" class="action">RESET GAME</button>
+  </div>
+
+  <div id="remaining" class="remaining"></div>
+  <div class="tiny">Completed games are removed from the wheel. When one game remains, it is automatically announced as the final game.</div>
+</div>
+
+<script>
+const ALL_GAMES = [
+  "See, Hear & Speak",
+  "Know Your Cuz",
+  "Finish That Cuzzo Song",
+  "Spotlight"
+];
+
+let games = [...ALL_GAMES];
+let currentRotation = 0;
+let selectedIndex = null;
+let spinning = false;
+
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
+const spinBtn = document.getElementById("spinBtn");
+const completeBtn = document.getElementById("completeBtn");
+const spinAgainBtn = document.getElementById("spinAgainBtn");
+const resetBtn = document.getElementById("resetBtn");
+const result = document.getElementById("result");
+const remaining = document.getElementById("remaining");
+
+const palette = ["#123A63","#0D6BA8","#1E2A48","#234E86"];
+
+function drawWheel(rotation = currentRotation, highlight = null){
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2;
+  const r = Math.min(W,H)*0.44;
+  ctx.clearRect(0,0,W,H);
+
+  // outer glow ring
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx,cy,r+22,0,Math.PI*2);
+  ctx.strokeStyle="rgba(94,196,255,.28)";
+  ctx.lineWidth=20;
+  ctx.shadowColor="rgba(32,167,255,.45)";
+  ctx.shadowBlur=30;
+  ctx.stroke();
+  ctx.restore();
+
+  if(games.length === 0) return;
+
+  const seg = (Math.PI*2)/games.length;
+  const base = -Math.PI/2 + rotation;
+
+  for(let i=0;i<games.length;i++){
+    const start = base + i*seg;
+    const end = start + seg;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,start,end);
+    ctx.closePath();
+
+    const grad = ctx.createRadialGradient(cx,cy,r*.1,cx,cy,r);
+    grad.addColorStop(0, i===highlight ? "#2f9ae0" : palette[i % palette.length]);
+    grad.addColorStop(1, i===highlight ? "#0d4f87" : "#0b1730");
+    ctx.fillStyle=grad;
+
+    if(i===highlight){
+      ctx.shadowColor="rgba(67,188,255,.95)";
+      ctx.shadowBlur=34;
+    }
+    ctx.fill();
+
+    ctx.strokeStyle="rgba(220,236,250,.75)";
+    ctx.lineWidth=4;
+    ctx.stroke();
+    ctx.restore();
+
+    // label
+    const mid = start + seg/2;
+    const tx = cx + Math.cos(mid)*r*.62;
+    const ty = cy + Math.sin(mid)*r*.62;
+    ctx.save();
+    ctx.translate(tx,ty);
+    ctx.rotate(mid + Math.PI/2);
+    ctx.fillStyle="#F5FAFF";
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+    ctx.font="800 28px system-ui, sans-serif";
+    wrapText(ctx,games[i],0,0,210,34);
+    ctx.restore();
+  }
+
+  // inner hub ring
+  ctx.beginPath();
+  ctx.arc(cx,cy,100,0,Math.PI*2);
+  ctx.fillStyle="#0b1120";
+  ctx.fill();
+  ctx.strokeStyle="rgba(230,240,255,.6)";
+  ctx.lineWidth=5;
+  ctx.stroke();
+}
+
+function wrapText(context, text, x, y, maxWidth, lineHeight){
+  const words = text.split(" ");
+  let line="", lines=[];
+  for(const word of words){
+    const test=line ? line+" "+word : word;
+    if(context.measureText(test).width > maxWidth && line){
+      lines.push(line);
+      line=word;
+    }else{
+      line=test;
+    }
+  }
+  lines.push(line);
+  const offset = -((lines.length-1)*lineHeight)/2;
+  lines.forEach((l,i)=>context.fillText(l,x,y+offset+i*lineHeight));
+}
+
+function setResult(eyebrow, winner, final=false){
+  result.innerHTML = `<div class="eyebrow">${eyebrow}</div><div class="winner ${final?'final':''}">${winner}</div>`;
+}
+
+function updateRemaining(){
+  remaining.textContent = `${games.length} game${games.length===1?'':'s'} remaining`;
+}
+
+function normalize(a){
+  const two=Math.PI*2;
+  return ((a%two)+two)%two;
+}
+
+function spin(){
+  if(spinning || games.length <= 1) return;
+  spinning=true;
+  selectedIndex=null;
+  completeBtn.disabled=true;
+  spinAgainBtn.disabled=true;
+  spinBtn.disabled=true;
+  setResult("Spinning","Who gets the spotlight next?");
+
+  const n = games.length;
+  const target = Math.floor(Math.random()*n);
+  const seg = Math.PI*2/n;
+
+  // pointer is at -PI/2. Want center of chosen segment to land there.
+  const desired = -target*seg - seg/2;
+  const startRotation = currentRotation;
+  let delta = normalize(desired - normalize(startRotation));
+  const extraTurns = (5 + Math.floor(Math.random()*4))*Math.PI*2;
+  const total = extraTurns + delta;
+  const duration = 4200 + Math.random()*900;
+  const start = performance.now();
+
+  function easeOutCubic(t){ return 1 - Math.pow(1-t,3); }
+
+  function frame(now){
+    const t=Math.min(1,(now-start)/duration);
+    currentRotation = startRotation + total*easeOutCubic(t);
+    drawWheel(currentRotation);
+    if(t<1){
+      requestAnimationFrame(frame);
+    }else{
+      currentRotation = normalize(currentRotation);
+      selectedIndex = target;
+      drawWheel(currentRotation, selectedIndex);
+      setResult("Next Game", games[selectedIndex]);
+      spinning=false;
+      completeBtn.disabled=false;
+      spinAgainBtn.disabled=false;
+      spinBtn.disabled=false;
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+function markComplete(){
+  if(selectedIndex===null || spinning) return;
+  const completed = games[selectedIndex];
+  games.splice(selectedIndex,1);
+  selectedIndex=null;
+  completeBtn.disabled=true;
+  spinAgainBtn.disabled=true;
+
+  if(games.length === 1){
+    currentRotation=0;
+    drawWheel(currentRotation,0);
+    setResult("Final Game Unlocked", games[0], true);
+    spinBtn.disabled=true;
+  }else if(games.length === 0){
+    setResult("Game Show Complete","All games finished!",true);
+    spinBtn.disabled=true;
+  }else{
+    currentRotation=0;
+    drawWheel();
+    setResult("Game Complete", `${completed} removed — spin again!`);
+    spinBtn.disabled=false;
+  }
+  updateRemaining();
+}
+
+function resetGame(){
+  games=[...ALL_GAMES];
+  currentRotation=0;
+  selectedIndex=null;
+  spinning=false;
+  drawWheel();
+  setResult("Ready","Spin for the next game");
+  completeBtn.disabled=true;
+  spinAgainBtn.disabled=true;
+  spinBtn.disabled=false;
+  updateRemaining();
+}
+
+spinBtn.addEventListener("click",spin);
+spinAgainBtn.addEventListener("click",spin);
+completeBtn.addEventListener("click",markComplete);
+resetBtn.addEventListener("click",resetGame);
+
+drawWheel();
+updateRemaining();
+</script>
+</body>
+</html>
